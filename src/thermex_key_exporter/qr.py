@@ -1,9 +1,8 @@
-"""Thermex Home OEM QR payload and rendering helpers."""
+"""Thermex Home OEM QR payload and terminal rendering helpers."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from io import BytesIO
 
 import qrcode
 from qrcode.constants import ERROR_CORRECT_Q
@@ -26,19 +25,8 @@ class QrChallenge:
         return f"{OEM_QR_LOGIN_PREFIX}{self.token}"
 
 
-def render_png(challenge: QrChallenge, box_size: int = 10) -> bytes:
-    """Render a QR challenge to PNG bytes with a reliable quiet zone."""
-    if box_size < 1:
-        raise ValueError("box_size must be positive")
-    code = _make_code(challenge, box_size)
-    image = code.make_image(fill_color="black", back_color="white")
-    output = BytesIO()
-    image.save(output, format="PNG")
-    return output.getvalue()
-
-
 def render_terminal(challenge: QrChallenge) -> str:
-    """Render a QR fallback suitable for a monochrome terminal window."""
+    """Render a QR challenge suitable for a monochrome terminal window."""
     matrix = _make_code(challenge, box_size=1).get_matrix()
     return "\n".join("".join("██" if cell else "  " for cell in row) for row in matrix)
 

@@ -4,13 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import tempfile
 import time
 import uuid
-import webbrowser
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 
 from . import APP_NAME, __version__
@@ -24,7 +19,7 @@ from .cloud_api import CloudError, QrState
 from .export import render_report, write_json, write_report
 from .models import DeviceRecord, ExportDocument
 from .profile_bundle import ProfileBundleError, load_bundled_profile, write_profile_bundle
-from .qr import QrChallenge, render_png, render_terminal
+from .qr import QrChallenge, render_terminal
 from .text_policy import forbidden_characters
 from .workflow import ExportWorkflow
 
@@ -116,9 +111,9 @@ def run_self_test() -> int:
     report = render_report(document)
     if device.local_key in report:
         raise RuntimeError("report exposes the full local key")
-    qr_png = render_png(QrChallenge("self-test-token"))
-    if not qr_png.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise RuntimeError("QR rendering did not produce a PNG image")
+    terminal_qr = render_terminal(QrChallenge("self-test-token"))
+    if "██" not in terminal_qr:
+        raise RuntimeError("QR rendering did not produce terminal output")
     if forbidden_characters(APP_NAME):
         raise RuntimeError("application name violates the text policy")
     print("Self-test passed")
@@ -157,31 +152,26 @@ def run_export(args: argparse.Namespace) -> int:
             profile = load_bundled_profile()
         workflow = ExportWorkflow.connect(profile, device_id=uuid.uuid4().hex)
         challenge = workflow.begin_qr_login()
-        print("Scan the QR code in Thermex Home and confirm the login.")
-        with _temporary_qr_png(render_png(challenge)) as qr_path:
-            if not webbrowser.open(qr_path.as_uri()):
-                print("The default viewer did not open. Scan this terminal QR instead:")
-                print(render_terminal(challenge))
-            deadline = time.monotonic() + args.timeout
-            while time.monotonic() < deadline:
-                result = workflow.poll_qr_login()
-                if result.state == QrState.CONFIRMED:
-                    document = workflow.build_export()
-                    output = args.output.expanduser()
-                    report = (
-                        args.report.expanduser()
-                        if args.report
-                        else output.with_suffix(".report.txt")
-                    )
-                    write_report(document, report)
-                    # If the report path cannot be written, do not leave the
-                    # more sensitive JSON behind as a partial export.
-                    write_json(document, output)
-                    print(f"Exported {len(document.devices)} device(s).")
-                    print(f"Private JSON: {output}")
-                    print(f"Redacted report: {report}")
-                    return 0
-                time.sleep(args.poll_interval)
+        print("Scan this QR code in Thermex Home and confirm the login:")
+        print(render_terminal(challenge))
+        deadline = time.monotonic() + args.timeout
+        while time.monotonic() < deadline:
+            result = workflow.poll_qr_login()
+            if result.state == QrState.CONFIRMED:
+                document = workflow.build_export()
+                output = args.output.expanduser()
+                report = (
+                    args.report.expanduser() if args.report else output.with_suffix(".report.txt")
+                )
+                write_report(document, report)
+                # If the report path cannot be written, do not leave the
+                # more sensitive JSON behind as a partial export.
+                write_json(document, output)
+                print(f"Exported {len(document.devices)} device(s).")
+                print(f"Private JSON: {output}")
+                print(f"Redacted report: {report}")
+                return 0
+            time.sleep(args.poll_interval)
         print("Timed out waiting for QR confirmation. No key export was written.")
         return 1
     except (CloudError, ProfileBundleError, ProfileExtractionError, OSError, RuntimeError) as error:
@@ -243,25 +233,3 @@ def run_profile_status() -> int:
         return 1
     print("Bundled Thermex profile is available.")
     return 0
-
-
-@contextmanager
-def _temporary_qr_png(png: bytes) -> Iterator[Path]:
-    """Expose a short-lived local QR image without leaving it on disk."""
-    descriptor, name = tempfile.mkstemp(prefix="thermex-key-exporter-", suffix=".png")
-    path = Path(name)
-    try:
-        fchmod = getattr(os, "fchmod", None)
-        if fchmod is not None:
-            try:
-                fchmod(descriptor, 0o600)
-            except OSError:
-                pass
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(png)
-        yield path
-    finally:
-        try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            pass

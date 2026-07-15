@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import thermex_key_exporter.cli as cli
@@ -16,6 +18,32 @@ def test_cli_without_a_subcommand_prints_help(capsys) -> None:
     captured = capsys.readouterr()
     assert "self-test" in captured.out
     assert "one-time QR" in captured.out
+
+
+def test_cli_self_test_does_not_require_pillow() -> None:
+    script = """
+import builtins
+
+original_import = builtins.__import__
+
+def reject_pillow(name, globals=None, locals=None, fromlist=(), level=0):
+    if name == "PIL" or name.startswith("PIL."):
+        raise ModuleNotFoundError("No module named 'PIL'", name="PIL")
+    return original_import(name, globals, locals, fromlist, level)
+
+builtins.__import__ = reject_pillow
+from thermex_key_exporter.cli import run_self_test
+raise SystemExit(run_self_test())
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "Self-test passed\n"
 
 
 def test_cli_export_writes_private_files_without_printing_the_key(
@@ -46,7 +74,6 @@ def test_cli_export_writes_private_files_without_printing_the_key(
         "connect",
         lambda _profile, *, device_id: workflow,
     )
-    monkeypatch.setattr(cli.webbrowser, "open", lambda _url: True)
     output = tmp_path / "thermex-localtuya.json"
 
     assert cli.main(["export", "--apk", "official.apk", "--output", str(output)]) == 0
@@ -58,6 +85,7 @@ def test_cli_export_writes_private_files_without_printing_the_key(
     if os.name == "posix":
         assert output.stat().st_mode & 0o777 == 0o600
         assert report.stat().st_mode & 0o777 == 0o600
+    assert "██" in captured.out
     assert "0123456789abcdef" not in captured.out
     assert "0123456789abcdef" not in report.read_text(encoding="utf-8")
     assert workflow.discarded
@@ -87,7 +115,6 @@ def test_cli_does_not_write_private_json_when_the_redacted_report_fails(
         "connect",
         lambda _profile, *, device_id: FakeWorkflow(),
     )
-    monkeypatch.setattr(cli.webbrowser, "open", lambda _url: True)
 
     def fail_report(*_args: object) -> None:
         raise OSError("report location is not writable")
@@ -131,20 +158,10 @@ def test_cli_export_uses_the_bundled_profile_when_no_apk_is_provided(tmp_path, m
         "connect",
         connect,
     )
-    monkeypatch.setattr(cli.webbrowser, "open", lambda _url: True)
 
     assert cli.main(["export", "--output", str(tmp_path / "keys.json")]) == 0
 
     assert captured["profile"] is bundled_profile
-
-
-def test_temporary_qr_png_works_without_posix_fchmod(monkeypatch) -> None:
-    monkeypatch.delattr(cli.os, "fchmod", raising=False)
-
-    with cli._temporary_qr_png(b"synthetic-png") as path:
-        assert path.read_bytes() == b"synthetic-png"
-
-    assert not path.exists()
 
 
 def test_cli_reports_when_google_play_has_a_new_version(monkeypatch, capsys) -> None:

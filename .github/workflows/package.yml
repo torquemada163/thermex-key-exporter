@@ -73,6 +73,12 @@ jobs:
         if: runner.os != 'macOS'
         run: python -m PyInstaller packaging/thermex-key-exporter-cli.spec --noconfirm --clean
 
+      - name: Verify CLI bundle excludes Pillow
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          python -c "from pathlib import Path; import sys; root = Path('dist/thermex-key-exporter'); matches = [path for path in root.rglob('*') if 'PIL' in path.parts]; print('\\n'.join(str(path) for path in matches)); sys.exit(bool(matches))"
+
       - name: Smoke-test CLI distribution
         if: runner.os != 'macOS'
         shell: bash

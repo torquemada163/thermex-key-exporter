@@ -9,6 +9,7 @@ import sys
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,7 @@ from .cli import main as cli_main
 from .cloud_api import CloudError, QrState
 from .export import write_json, write_report
 from .profile_bundle import ProfileBundleError, load_bundled_profile
-from .qr import render_png
+from .qr import QrChallenge
 from .workflow import ExportWorkflow
 
 
@@ -32,9 +33,10 @@ def _default_output_path() -> Path:
 class ExportWindow:
     """Own the widgets and background worker for one desktop export window."""
 
-    def __init__(self, tk: Any, filedialog: Any) -> None:
+    def __init__(self, tk: Any, filedialog: Any, render_qr: Callable[[QrChallenge], bytes]) -> None:
         self.tk = tk
         self.filedialog = filedialog
+        self._render_qr = render_qr
         self.root = tk.Tk()
         self.root.title(APP_NAME)
         self.root.minsize(680, 480)
@@ -136,7 +138,7 @@ class ExportWindow:
             profile = load_bundled_profile()
             workflow = ExportWorkflow.connect(profile, device_id=uuid.uuid4().hex)
             challenge = workflow.begin_qr_login()
-            self._events.put(("qr", render_png(challenge)))
+            self._events.put(("qr", self._render_qr(challenge)))
             self._events.put(("status", "Scan the QR code in Thermex Home and confirm the login."))
             deadline = time.monotonic() + 300.0
             while time.monotonic() < deadline:
@@ -238,12 +240,31 @@ def run(*, import_check: bool = False) -> int:
         return 2
     try:
         filedialog = importlib.import_module("tkinter.filedialog")
+        render_qr = _load_gui_renderer()
+        if render_qr is None:
+            print(
+                "GUI is unavailable because Pillow is not installed. "
+                "Install thermex-key-exporter with its gui extra.",
+                file=sys.stderr,
+            )
+            return 2
         if import_check:
             return 0
-        return ExportWindow(tk, filedialog).run()
+        return ExportWindow(tk, filedialog, render_qr).run()
     except tk.TclError as error:
         print(f"GUI could not start: {error}", file=sys.stderr)
         return 2
+
+
+def _load_gui_renderer() -> Callable[[QrChallenge], bytes] | None:
+    """Load the Pillow-backed renderer without making it a CLI requirement."""
+    try:
+        from .gui_qr import render_png
+    except ModuleNotFoundError as error:
+        if error.name not in {"PIL", "PIL.Image"}:
+            raise
+        return None
+    return render_png
 
 
 def run_desktop(argv: list[str] | None = None, *, import_check: bool = False) -> int:

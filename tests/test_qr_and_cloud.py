@@ -10,7 +10,8 @@ from thermex_key_exporter.cloud_api import (
     require_success,
     result_value,
 )
-from thermex_key_exporter.qr import OEM_QR_LOGIN_PREFIX, QrChallenge, render_png, render_terminal
+from thermex_key_exporter.gui_qr import render_png
+from thermex_key_exporter.qr import OEM_QR_LOGIN_PREFIX, QrChallenge, render_terminal
 
 
 def test_qr_payload_and_png() -> None:

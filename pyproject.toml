@@ -13,12 +13,15 @@ authors = [{ name = "Thermex Key Exporter contributors" }]
 dependencies = [
   "certifi>=2024.12.14",
   "cryptography>=43",
-  "Pillow>=10",
   "qrcode>=8",
 ]
 
 [project.optional-dependencies]
+gui = [
+  "Pillow>=10",
+]
 dev = [
+  "Pillow>=10",
   "pyinstaller>=6.10",
   "pytest>=8",
   "ruff>=0.8",

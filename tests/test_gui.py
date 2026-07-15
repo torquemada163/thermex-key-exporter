@@ -18,6 +18,16 @@ def test_gui_reports_a_missing_tkinter_runtime_clearly(monkeypatch, capsys) -> N
     assert "Tkinter" in captured.err
 
 
+def test_gui_reports_a_missing_pillow_runtime_clearly(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(gui.importlib, "import_module", lambda _name: object())
+    monkeypatch.setattr(gui, "_load_gui_renderer", lambda: None)
+
+    assert gui.run() == 2
+
+    captured = capsys.readouterr()
+    assert "Pillow" in captured.err
+
+
 def test_gui_import_check_loads_dynamic_tkinter_modules(monkeypatch) -> None:
     imported: list[str] = []
 

@@ -26,7 +26,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=["PIL", "qrcode.image.pil"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)
