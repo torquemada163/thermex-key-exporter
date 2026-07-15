@@ -20,6 +20,14 @@ from .qr import render_png
 from .workflow import ExportWorkflow
 
 
+def _default_output_path() -> Path:
+    """Choose a writable user-owned default independent of the launch directory."""
+    try:
+        return Path.home() / "thermex-localtuya.json"
+    except RuntimeError:
+        return Path("thermex-localtuya.json").resolve()
+
+
 class ExportWindow:
     """Own the widgets and background worker for one desktop export window."""
 
@@ -31,7 +39,7 @@ class ExportWindow:
         self.root.minsize(680, 480)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        self.output_path = tk.StringVar(value=str(Path.cwd() / "thermex-localtuya.json"))
+        self.output_path = tk.StringVar(value=str(_default_output_path()))
         self.status = tk.StringVar(value="Ready to create a one-time Thermex Home QR login.")
         self._events: queue.SimpleQueue[tuple[str, object]] = queue.SimpleQueue()
         self._cancel = threading.Event()

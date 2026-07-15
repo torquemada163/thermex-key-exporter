@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 import sys
 
+from PyInstaller.utils.hooks import collect_data_files
+
 if importlib.util.find_spec("_tkinter") is None:
     raise SystemExit(
         "GUI packaging requires a Python distribution with the _tkinter extension."
@@ -11,7 +13,7 @@ if importlib.util.find_spec("_tkinter") is None:
 ROOT = Path(SPECPATH).parent
 SOURCE = ROOT / "packaging" / "gui_entrypoint.py"
 profile_path = os.environ.get("THERMEX_PROFILE_PATH")
-datas = []
+datas = collect_data_files("certifi")
 if profile_path:
     profile_file = Path(profile_path).expanduser()
     if not profile_file.is_absolute():
@@ -19,7 +21,7 @@ if profile_path:
     profile_file = profile_file.resolve()
     if not profile_file.is_file():
         raise SystemExit("THERMEX_PROFILE_PATH does not point to a readable profile bundle.")
-    datas = [(str(profile_file), "thermex_key_exporter/data")]
+    datas.append((str(profile_file), "thermex_key_exporter/data"))
 
 a = Analysis(
     [str(SOURCE)],

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import json
+import socket
+import ssl
 import time
 import uuid
 from collections.abc import Callable, Mapping
@@ -12,6 +14,8 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+
+import certifi
 
 from .cloud_api import CloudError, normalize_api_name, parse_json_payload
 from .crypto import decrypt_response_base64, encrypt_gcm, md5_hex
@@ -29,6 +33,26 @@ class PreparedRequest:
     headers: Mapping[str, str]
     params: Mapping[str, str]
     body: bytes
+
+
+def _secure_urlopen(request: Request, *, timeout: float) -> Any:
+    """Open HTTPS requests with the CA bundle shipped in every release."""
+    context = ssl.create_default_context(cafile=certifi.where())
+    return urlopen(request, timeout=timeout, context=context)
+
+
+def _url_error_message(error: URLError) -> str:
+    """Describe common network failures without exposing request details."""
+    reason = error.reason
+    if isinstance(reason, socket.gaierror):
+        return "could not resolve the Thermex cloud API hostname"
+    if isinstance(reason, ssl.SSLCertVerificationError):
+        return "could not verify the Thermex cloud API TLS certificate"
+    if isinstance(reason, ssl.SSLError):
+        return "could not establish a secure TLS connection to the Thermex cloud API"
+    if isinstance(reason, TimeoutError):
+        return "the Thermex cloud API connection timed out"
+    return "could not connect to the Thermex cloud API"
 
 
 class CloudTransport:
@@ -53,7 +77,7 @@ class CloudTransport:
         self._now = now
         self._request_id_factory = request_id_factory or (lambda: str(uuid.uuid4()))
         self._timeout = timeout
-        self._opener = opener or urlopen
+        self._opener = opener or _secure_urlopen
 
     def prepare(
         self,
@@ -145,7 +169,7 @@ class CloudTransport:
         except HTTPError as error:
             raise CloudError(f"cloud API returned HTTP {error.code}") from error
         except URLError as error:
-            raise CloudError("could not connect to the Thermex cloud API") from error
+            raise CloudError(_url_error_message(error)) from error
 
     def decode_response(
         self,

@@ -79,6 +79,8 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
             executable="dist/thermex-key-exporter/thermex-key-exporter.exe"
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            executable="dist/ThermexKeyExporterCLI.app/Contents/MacOS/thermex-key-exporter"
           else
             executable="dist/thermex-key-exporter/thermex-key-exporter"
           fi
@@ -105,6 +107,13 @@ jobs:
           fi
           "$executable"
 
+      - name: Verify macOS application bundle signatures
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          codesign --verify --deep --strict --verbose=2 dist/ThermexKeyExporterCLI.app
+          codesign --verify --deep --strict --verbose=2 dist/ThermexKeyExporter.app
+
       - name: Verify embedded release profile
         if: steps.profile.outputs.kind == 'release-profile'
         run: python -c "from pathlib import Path; assert list(Path('dist').rglob('thermex-profile.json'))"
@@ -119,7 +128,7 @@ jobs:
           archive_name="thermex-key-exporter-${PLATFORM}.zip"
           archive="release/$archive_name"
           staging="$(mktemp -d)"
-          ditto dist/thermex-key-exporter "$staging/thermex-key-exporter"
+          ditto dist/ThermexKeyExporterCLI.app "$staging/ThermexKeyExporterCLI.app"
           ditto dist/ThermexKeyExporter.app "$staging/ThermexKeyExporter.app"
           ditto -c -k --sequesterRsrc "$staging" "$archive"
           rm -rf "$staging"
@@ -127,6 +136,20 @@ jobs:
             cd release
             shasum -a 256 "$archive_name" > SHA256SUMS.txt
           )
+
+      - name: Verify macOS release archive
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.label }}
+        run: |
+          archive="release/thermex-key-exporter-${PLATFORM}.zip"
+          extracted="$(mktemp -d)"
+          ditto -x -k "$archive" "$extracted"
+          codesign --verify --deep --strict --verbose=2 "$extracted/ThermexKeyExporterCLI.app"
+          codesign --verify --deep --strict --verbose=2 "$extracted/ThermexKeyExporter.app"
+          "$extracted/ThermexKeyExporterCLI.app/Contents/MacOS/thermex-key-exporter" --version
+          THERMEX_GUI_IMPORT_CHECK=1 "$extracted/ThermexKeyExporter.app/Contents/MacOS/ThermexKeyExporter"
 
       - name: Package Linux release archive
         if: runner.os == 'Linux'

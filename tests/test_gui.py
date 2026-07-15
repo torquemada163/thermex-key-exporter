@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import thermex_key_exporter.gui as gui
 
 
@@ -27,3 +29,9 @@ def test_gui_import_check_loads_dynamic_tkinter_modules(monkeypatch) -> None:
 
     assert gui.run(import_check=True) == 0
     assert imported == ["tkinter", "tkinter.filedialog"]
+
+
+def test_gui_default_output_path_uses_the_home_directory(monkeypatch) -> None:
+    monkeypatch.setattr(gui.Path, "home", lambda: Path("/synthetic-home"))
+
+    assert gui._default_output_path() == Path("/synthetic-home/thermex-localtuya.json")

@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import base64
 import json
+import socket
+import ssl
+from urllib.error import URLError
 
 import pytest
 
+import thermex_key_exporter.transport as transport_module
 from thermex_key_exporter.cloud_api import CloudError
 from thermex_key_exporter.crypto import decrypt_gcm, encrypt_gcm, md5_hex
 from thermex_key_exporter.profile import SdkProfile
@@ -127,3 +131,53 @@ def test_live_send_uses_a_form_post_without_exposing_params_in_the_url() -> None
     assert request.full_url == prepared.url
     assert request.data == prepared.body
     assert captured["timeout"] == 20.0
+
+
+def test_default_opener_uses_the_certifi_ca_bundle(monkeypatch) -> None:
+    request = object()
+    context = object()
+    response = object()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(transport_module.certifi, "where", lambda: "/synthetic/cacert.pem")
+    monkeypatch.setattr(
+        transport_module.ssl,
+        "create_default_context",
+        lambda *, cafile: captured.setdefault("cafile", cafile) and context,
+    )
+
+    def fake_urlopen(actual_request: object, *, timeout: float, context: object) -> object:
+        captured["request"] = actual_request
+        captured["timeout"] = timeout
+        captured["context"] = context
+        return response
+
+    monkeypatch.setattr(transport_module, "urlopen", fake_urlopen)
+
+    assert transport_module._secure_urlopen(request, timeout=12.5) is response
+    assert captured == {
+        "cafile": "/synthetic/cacert.pem",
+        "request": request,
+        "timeout": 12.5,
+        "context": context,
+    }
+
+
+@pytest.mark.parametrize(
+    ("reason", "message"),
+    [
+        (socket.gaierror(socket.EAI_NONAME, "synthetic"), "could not resolve"),
+        (ssl.SSLCertVerificationError(1, "synthetic"), "could not verify"),
+        (TimeoutError("synthetic"), "timed out"),
+        (OSError("synthetic"), "could not connect"),
+    ],
+)
+def test_send_reports_safe_network_failure_categories(reason: OSError, message: str) -> None:
+    def opener(_request: object, *, timeout: float) -> object:
+        raise URLError(reason)
+
+    transport = CloudTransport(profile(), device_id="synthetic-device-id", opener=opener)
+    prepared = transport.prepare("thing.test", "1.0")
+
+    with pytest.raises(CloudError, match=message):
+        transport.send(prepared)
