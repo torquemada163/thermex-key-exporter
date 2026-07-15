@@ -91,6 +91,20 @@ jobs:
       - name: Build GUI distribution
         run: python -m PyInstaller packaging/thermex-key-exporter-gui.spec --noconfirm --clean
 
+      - name: Smoke-test GUI distribution imports
+        shell: bash
+        env:
+          THERMEX_GUI_IMPORT_CHECK: "1"
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            executable="dist/ThermexKeyExporter/ThermexKeyExporter.exe"
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            executable="dist/ThermexKeyExporter.app/Contents/MacOS/ThermexKeyExporter"
+          else
+            executable="dist/ThermexKeyExporter/ThermexKeyExporter"
+          fi
+          "$executable"
+
       - name: Verify embedded release profile
         if: steps.profile.outputs.kind == 'release-profile'
         run: python -c "from pathlib import Path; assert list(Path('dist').rglob('thermex-profile.json'))"

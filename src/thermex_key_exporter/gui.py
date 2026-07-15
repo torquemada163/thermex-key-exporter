@@ -215,8 +215,8 @@ class ExportWindow:
         return 0
 
 
-def run() -> int:
-    """Start the GUI or return a clear error for Python builds without Tkinter."""
+def run(*, import_check: bool = False) -> int:
+    """Start the GUI or verify its Tkinter imports for a frozen-app smoke test."""
     try:
         tk = importlib.import_module("tkinter")
     except ModuleNotFoundError as error:
@@ -229,6 +229,8 @@ def run() -> int:
         return 2
     try:
         filedialog = importlib.import_module("tkinter.filedialog")
+        if import_check:
+            return 0
         return ExportWindow(tk, filedialog).run()
     except tk.TclError as error:
         print(f"GUI could not start: {error}", file=sys.stderr)
