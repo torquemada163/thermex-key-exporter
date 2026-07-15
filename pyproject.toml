@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,13 +8,32 @@ version = "0.1.0"
 description = "Desktop utility for exporting Thermex local Tuya keys"
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Thermex Key Exporter contributors" }]
+keywords = ["home-assistant", "localtuya", "thermex", "tuya"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Home Automation",
+]
 dependencies = [
   "certifi>=2024.12.14",
   "cryptography>=43",
   "qrcode>=8",
 ]
+
+[project.urls]
+Homepage = "https://github.com/torquemada163/thermex-key-exporter"
+Repository = "https://github.com/torquemada163/thermex-key-exporter"
+Issues = "https://github.com/torquemada163/thermex-key-exporter/issues"
 
 [project.optional-dependencies]
 gui = [
@@ -22,19 +41,25 @@ gui = [
 ]
 dev = [
   "Pillow>=10",
+  "build>=1.2",
+  "pipx>=1.7",
   "pyinstaller>=6.10",
   "pytest>=8",
   "ruff>=0.8",
+  "twine>=6",
 ]
 
 [project.scripts]
 thermex-key-exporter = "thermex_key_exporter.cli:main"
 
-[project.gui-scripts]
-thermex-key-exporter-gui = "thermex_key_exporter.gui:run"
+[tool.setuptools]
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+thermex_key_exporter = ["data/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

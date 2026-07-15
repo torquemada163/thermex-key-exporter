@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Подготовлена воспроизводимая сборка Python wheel и source distribution для
+  будущего PyPI-канала CLI, включая изолированную проверку через pipx.
+- Добавлен workflow trusted publishing с защищённым окружением; пакет в PyPI
+  этим изменением не публикуется.
+- Нативные Release-архивы теперь содержат: macOS — только GUI, Windows — GUI
+  и CLI, Linux — только CLI. GUI-bundle больше не перенаправляет аргументы в
+  CLI.
+
 ## 0.1.0 — 2026-07-15
 
 - Подготовлен первый публичный выпуск Thermex Key Exporter.

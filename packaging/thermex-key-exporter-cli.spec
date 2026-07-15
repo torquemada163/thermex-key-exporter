@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-import sys
 
 from PyInstaller.utils.hooks import collect_data_files
 
@@ -51,10 +50,3 @@ coll = COLLECT(
     upx=False,
     name="thermex-key-exporter",
 )
-if sys.platform == "darwin":
-    app = BUNDLE(
-        coll,
-        name="ThermexKeyExporterCLI.app",
-        icon=None,
-        bundle_identifier="io.github.thermexkeyexporter.cli",
-    )

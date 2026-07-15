@@ -52,6 +52,7 @@ thermex-report*.txt
 !.env.example
 secrets/
 private/
+src/thermex_key_exporter/data/thermex-profile.json
 thermex-credentials.json
 thermex-credentials.json.example
 thermex-local-secrets.json

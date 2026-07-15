@@ -17,6 +17,7 @@ TEXT_PATHS = (
     ROOT / "CHANGELOG.md",
     ROOT / "LICENSE",
     ROOT / "pyproject.toml",
+    ROOT / "docs",
     ROOT / "private" / "docs",
     ROOT / "src",
     ROOT / "tests",
