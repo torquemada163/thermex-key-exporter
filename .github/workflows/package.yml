@@ -104,8 +104,11 @@ jobs:
           mkdir -p release
           archive_name="thermex-key-exporter-${PLATFORM}.zip"
           archive="release/$archive_name"
-          ditto -c -k --sequesterRsrc --keepParent \
-            dist/thermex-key-exporter dist/ThermexKeyExporter.app "$archive"
+          staging="$(mktemp -d)"
+          ditto dist/thermex-key-exporter "$staging/thermex-key-exporter"
+          ditto dist/ThermexKeyExporter.app "$staging/ThermexKeyExporter.app"
+          ditto -c -k --sequesterRsrc "$staging" "$archive"
+          rm -rf "$staging"
           (
             cd release
             shasum -a 256 "$archive_name" > SHA256SUMS.txt
