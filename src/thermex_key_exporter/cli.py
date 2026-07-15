@@ -251,10 +251,12 @@ def _temporary_qr_png(png: bytes) -> Iterator[Path]:
     descriptor, name = tempfile.mkstemp(prefix="thermex-key-exporter-", suffix=".png")
     path = Path(name)
     try:
-        try:
-            os.fchmod(descriptor, 0o600)
-        except OSError:
-            pass
+        fchmod = getattr(os, "fchmod", None)
+        if fchmod is not None:
+            try:
+                fchmod(descriptor, 0o600)
+            except OSError:
+                pass
         with os.fdopen(descriptor, "wb") as stream:
             stream.write(png)
         yield path

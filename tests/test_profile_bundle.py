@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -32,7 +33,8 @@ def test_profile_bundle_round_trip_is_private(tmp_path: Path) -> None:
     write_profile_bundle(profile(), path)
 
     assert load_profile_bundle(path) == profile()
-    assert path.stat().st_mode & 0o777 == 0o600
+    if os.name == "posix":
+        assert path.stat().st_mode & 0o777 == 0o600
 
 
 def test_bundled_profile_is_loaded_from_the_pyinstaller_data_path(tmp_path, monkeypatch) -> None:

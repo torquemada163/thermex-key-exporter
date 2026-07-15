@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
 
 import thermex_key_exporter.cli as cli
@@ -54,8 +55,9 @@ def test_cli_export_writes_private_files_without_printing_the_key(
     captured = capsys.readouterr()
     assert output.is_file()
     assert report.is_file()
-    assert output.stat().st_mode & 0o777 == 0o600
-    assert report.stat().st_mode & 0o777 == 0o600
+    if os.name == "posix":
+        assert output.stat().st_mode & 0o777 == 0o600
+        assert report.stat().st_mode & 0o777 == 0o600
     assert "0123456789abcdef" not in captured.out
     assert "0123456789abcdef" not in report.read_text(encoding="utf-8")
     assert workflow.discarded
@@ -134,6 +136,15 @@ def test_cli_export_uses_the_bundled_profile_when_no_apk_is_provided(tmp_path, m
     assert cli.main(["export", "--output", str(tmp_path / "keys.json")]) == 0
 
     assert captured["profile"] is bundled_profile
+
+
+def test_temporary_qr_png_works_without_posix_fchmod(monkeypatch) -> None:
+    monkeypatch.delattr(cli.os, "fchmod", raising=False)
+
+    with cli._temporary_qr_png(b"synthetic-png") as path:
+        assert path.read_bytes() == b"synthetic-png"
+
+    assert not path.exists()
 
 
 def test_cli_reports_when_google_play_has_a_new_version(monkeypatch, capsys) -> None:

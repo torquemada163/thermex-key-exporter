@@ -1,4 +1,5 @@
 import json
+import os
 
 from thermex_key_exporter.export import mask_secret, render_report, write_json, write_report
 from thermex_key_exporter.models import DeviceRecord, ExportDocument
@@ -42,6 +43,7 @@ def test_json_and_report_are_atomic_private_files(tmp_path) -> None:
 
     payload = json.loads(json_path.read_text(encoding="utf-8"))
     assert payload["devices"][0]["local_key"] == "0123456789abcdef"
-    assert json_path.stat().st_mode & 0o777 == 0o600
-    assert report_path.stat().st_mode & 0o777 == 0o600
+    if os.name == "posix":
+        assert json_path.stat().st_mode & 0o777 == 0o600
+        assert report_path.stat().st_mode & 0o777 == 0o600
     assert not list(tmp_path.glob("*.tmp"))

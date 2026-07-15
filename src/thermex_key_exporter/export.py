@@ -75,9 +75,15 @@ def _atomic_write(path: Path, content: str) -> None:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        os.chmod(temporary_path, 0o600)
+        _restrict_to_owner(temporary_path)
         os.replace(temporary_path, path)
-        os.chmod(path, 0o600)
+        _restrict_to_owner(path)
     finally:
         if temporary_path is not None and temporary_path.exists():
             temporary_path.unlink()
+
+
+def _restrict_to_owner(path: Path) -> None:
+    """Apply POSIX owner-only permissions where that permission model exists."""
+    if os.name == "posix":
+        os.chmod(path, 0o600)
