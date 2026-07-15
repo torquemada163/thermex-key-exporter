@@ -70,17 +70,17 @@ jobs:
         run: python -c "import tkinter; print(tkinter.TkVersion)"
 
       - name: Build CLI distribution
+        if: runner.os != 'macOS'
         run: python -m PyInstaller packaging/thermex-key-exporter-cli.spec --noconfirm --clean
 
       - name: Smoke-test CLI distribution
+        if: runner.os != 'macOS'
         shell: bash
         env:
           PROFILE_KIND: ${{ steps.profile.outputs.kind }}
         run: |
           if [ "$RUNNER_OS" = "Windows" ]; then
             executable="dist/thermex-key-exporter/thermex-key-exporter.exe"
-          elif [ "$RUNNER_OS" = "macOS" ]; then
-            executable="dist/ThermexKeyExporterCLI.app/Contents/MacOS/thermex-key-exporter"
           else
             executable="dist/thermex-key-exporter/thermex-key-exporter"
           fi
@@ -107,11 +107,23 @@ jobs:
           fi
           "$executable"
 
+      - name: Smoke-test macOS CLI entry point
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          PROFILE_KIND: ${{ steps.profile.outputs.kind }}
+        run: |
+          executable="dist/ThermexKeyExporter.app/Contents/MacOS/ThermexKeyExporter"
+          "$executable" --version
+          "$executable" self-test
+          if [ "$PROFILE_KIND" = "release-profile" ]; then
+            "$executable" profile-status
+          fi
+
       - name: Verify macOS application bundle signatures
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          codesign --verify --deep --strict --verbose=2 dist/ThermexKeyExporterCLI.app
           codesign --verify --deep --strict --verbose=2 dist/ThermexKeyExporter.app
 
       - name: Verify embedded release profile
@@ -128,8 +140,8 @@ jobs:
           archive_name="thermex-key-exporter-${PLATFORM}.zip"
           archive="release/$archive_name"
           staging="$(mktemp -d)"
-          ditto dist/ThermexKeyExporterCLI.app "$staging/ThermexKeyExporterCLI.app"
           ditto dist/ThermexKeyExporter.app "$staging/ThermexKeyExporter.app"
+          ln -s "ThermexKeyExporter.app/Contents/MacOS/ThermexKeyExporter" "$staging/thermex-key-exporter"
           ditto -c -k --sequesterRsrc "$staging" "$archive"
           rm -rf "$staging"
           (
@@ -142,13 +154,18 @@ jobs:
         shell: bash
         env:
           PLATFORM: ${{ matrix.label }}
+          PROFILE_KIND: ${{ steps.profile.outputs.kind }}
         run: |
           archive="release/thermex-key-exporter-${PLATFORM}.zip"
           extracted="$(mktemp -d)"
           ditto -x -k "$archive" "$extracted"
-          codesign --verify --deep --strict --verbose=2 "$extracted/ThermexKeyExporterCLI.app"
           codesign --verify --deep --strict --verbose=2 "$extracted/ThermexKeyExporter.app"
-          "$extracted/ThermexKeyExporterCLI.app/Contents/MacOS/thermex-key-exporter" --version
+          test -L "$extracted/thermex-key-exporter"
+          "$extracted/thermex-key-exporter" --version
+          "$extracted/thermex-key-exporter" self-test
+          if [ "$PROFILE_KIND" = "release-profile" ]; then
+            "$extracted/thermex-key-exporter" profile-status
+          fi
           THERMEX_GUI_IMPORT_CHECK=1 "$extracted/ThermexKeyExporter.app/Contents/MacOS/ThermexKeyExporter"
 
       - name: Package Linux release archive

@@ -35,3 +35,37 @@ def test_gui_default_output_path_uses_the_home_directory(monkeypatch) -> None:
     monkeypatch.setattr(gui.Path, "home", lambda: Path("/synthetic-home"))
 
     assert gui._default_output_path() == Path("/synthetic-home/thermex-localtuya.json")
+
+
+def test_gui_desktop_entrypoint_routes_terminal_arguments_to_the_cli(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_cli(arguments: list[str]) -> int:
+        captured["arguments"] = arguments
+        return 7
+
+    monkeypatch.setattr(
+        gui,
+        "cli_main",
+        fake_cli,
+    )
+
+    assert gui.run_desktop(["-psn_0_12345", "--version"]) == 7
+    assert captured == {"arguments": ["--version"]}
+
+
+def test_gui_desktop_entrypoint_runs_the_gui_without_user_arguments(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_gui(*, import_check: bool) -> int:
+        captured["import_check"] = import_check
+        return 9
+
+    monkeypatch.setattr(
+        gui,
+        "run",
+        fake_gui,
+    )
+
+    assert gui.run_desktop(["-psn_0_12345"], import_check=True) == 9
+    assert captured == {"import_check": True}

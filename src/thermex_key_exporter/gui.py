@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from . import APP_NAME, __version__
+from .cli import main as cli_main
 from .cloud_api import CloudError, QrState
 from .export import write_json, write_report
 from .profile_bundle import ProfileBundleError, load_bundled_profile
@@ -243,3 +244,12 @@ def run(*, import_check: bool = False) -> int:
     except tk.TclError as error:
         print(f"GUI could not start: {error}", file=sys.stderr)
         return 2
+
+
+def run_desktop(argv: list[str] | None = None, *, import_check: bool = False) -> int:
+    """Run the GUI by default, or expose the CLI from the same macOS bundle."""
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    arguments = [argument for argument in arguments if not argument.startswith("-psn_")]
+    if arguments:
+        return cli_main(arguments)
+    return run(import_check=import_check)
