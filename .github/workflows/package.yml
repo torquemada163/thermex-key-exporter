@@ -22,26 +22,32 @@ jobs:
             label: linux-x64
           - os: windows-2022
             label: windows-x64
-          - os: macos-13
-            label: macos-x86_64
           - os: macos-14
             label: macos-arm64
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Tk runtime on Linux
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y python3-tk
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install project
         run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      - name: Run release checks
+        run: |
+          python -m pytest -q
+          python -m thermex_key_exporter self-test
+          python -m ruff check src tests scripts packaging
+          python -m ruff format --check src tests scripts packaging
+          python scripts/check_text_policy.py
 
       - name: Restore optional private release profile
         id: profile
@@ -59,14 +65,6 @@ jobs:
         env:
           PROFILE_PATH: ${{ runner.temp }}/thermex-profile.json
           THERMEX_PROFILE_B64: ${{ secrets.THERMEX_PROFILE_B64 }}
-
-      - name: Run release checks
-        run: |
-          python -m pytest -q
-          python -m thermex_key_exporter self-test
-          python -m ruff check src tests scripts packaging
-          python -m ruff format --check src tests scripts packaging
-          python scripts/check_text_policy.py
 
       - name: Verify GUI runtime dependency
         run: python -c "import tkinter; print(tkinter.TkVersion)"
@@ -141,7 +139,7 @@ jobs:
           "$hash  $([System.IO.Path]::GetFileName($archive))" | Set-Content release/SHA256SUMS.txt -NoNewline -Encoding ascii
 
       - name: Upload release archives
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: thermex-key-exporter-${{ matrix.label }}-${{ steps.profile.outputs.kind }}
           path: release/
