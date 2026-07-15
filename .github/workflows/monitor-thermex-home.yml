@@ -1,0 +1,68 @@
+name: Monitor Thermex Home
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 8 * * *"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  monitor:
+    name: Check the public Google Play listing
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check the verified profile version
+        id: check
+        run: python scripts/check_thermex_home_update.py --github-output "$GITHUB_OUTPUT"
+
+      - name: Open a manual profile-review issue
+        if: steps.check.outputs.update_available == 'true'
+        uses: actions/github-script@v7
+        env:
+          STORE_VERSION: ${{ steps.check.outputs.store_version }}
+          VERIFIED_VERSION: ${{ steps.check.outputs.verified_version }}
+        with:
+          script: |
+            const title = "Thermex Home update requires profile review";
+            const { owner, repo } = context.repo;
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: "open",
+              per_page: 100,
+            });
+            if (openIssues.some((issue) => issue.title === title)) {
+              core.info("An open profile-review issue already exists.");
+              return;
+            }
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body: [
+                `Google Play reports Thermex Home ${process.env.STORE_VERSION}.`,
+                `The profile in this repository was verified with ${process.env.VERIFIED_VERSION}.`,
+                "",
+                "No APK was downloaded, no profile was changed, and no utility release was created.",
+                "",
+                "Manual follow-up:",
+                "1. Update Thermex Home on the maintainer phone.",
+                "2. Obtain that APK through the approved manual process.",
+                "3. Prepare and verify a new private profile bundle.",
+                "4. Update the verified version, build native artifacts, and test them.",
+                "5. Close this issue only after the manual release is ready.",
+              ].join("\n"),
+            });

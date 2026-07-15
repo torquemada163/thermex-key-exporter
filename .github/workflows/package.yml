@@ -1,0 +1,148 @@
+name: Package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            label: linux-x64
+          - os: windows-2022
+            label: windows-x64
+          - os: macos-13
+            label: macos-x86_64
+          - os: macos-14
+            label: macos-arm64
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Tk runtime on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y python3-tk
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+
+      - name: Restore optional private release profile
+        id: profile
+        shell: bash
+        run: |
+          if [ -z "$THERMEX_PROFILE_B64" ]; then
+            echo "kind=developer-no-profile" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          profile_path="$RUNNER_TEMP/thermex-profile.json"
+          python -c "import base64, os, pathlib; pathlib.Path(os.environ['PROFILE_PATH']).write_bytes(base64.b64decode(os.environ['THERMEX_PROFILE_B64']))"
+          chmod 600 "$profile_path"
+          echo "THERMEX_PROFILE_PATH=$profile_path" >> "$GITHUB_ENV"
+          echo "kind=release-profile" >> "$GITHUB_OUTPUT"
+        env:
+          PROFILE_PATH: ${{ runner.temp }}/thermex-profile.json
+          THERMEX_PROFILE_B64: ${{ secrets.THERMEX_PROFILE_B64 }}
+
+      - name: Run release checks
+        run: |
+          python -m pytest -q
+          python -m thermex_key_exporter self-test
+          python -m ruff check src tests scripts packaging
+          python -m ruff format --check src tests scripts packaging
+          python scripts/check_text_policy.py
+
+      - name: Verify GUI runtime dependency
+        run: python -c "import tkinter; print(tkinter.TkVersion)"
+
+      - name: Build CLI distribution
+        run: python -m PyInstaller packaging/thermex-key-exporter-cli.spec --noconfirm --clean
+
+      - name: Smoke-test CLI distribution
+        shell: bash
+        env:
+          PROFILE_KIND: ${{ steps.profile.outputs.kind }}
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            executable="dist/thermex-key-exporter/thermex-key-exporter.exe"
+          else
+            executable="dist/thermex-key-exporter/thermex-key-exporter"
+          fi
+          "$executable" --version
+          "$executable" self-test
+          if [ "$PROFILE_KIND" = "release-profile" ]; then
+            "$executable" profile-status
+          fi
+
+      - name: Build GUI distribution
+        run: python -m PyInstaller packaging/thermex-key-exporter-gui.spec --noconfirm --clean
+
+      - name: Verify embedded release profile
+        if: steps.profile.outputs.kind == 'release-profile'
+        run: python -c "from pathlib import Path; assert list(Path('dist').rglob('thermex-profile.json'))"
+
+      - name: Package macOS release archive
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.label }}
+        run: |
+          mkdir -p release
+          archive_name="thermex-key-exporter-${PLATFORM}.zip"
+          archive="release/$archive_name"
+          ditto -c -k --sequesterRsrc --keepParent \
+            dist/thermex-key-exporter dist/ThermexKeyExporter.app "$archive"
+          (
+            cd release
+            shasum -a 256 "$archive_name" > SHA256SUMS.txt
+          )
+
+      - name: Package Linux release archive
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.label }}
+        run: |
+          mkdir -p release
+          archive_name="thermex-key-exporter-${PLATFORM}.tar.gz"
+          archive="release/$archive_name"
+          tar -C dist -czf "$archive" thermex-key-exporter ThermexKeyExporter
+          (
+            cd release
+            sha256sum "$archive_name" > SHA256SUMS.txt
+          )
+
+      - name: Package Windows release archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          PLATFORM: ${{ matrix.label }}
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          $archive = "release/thermex-key-exporter-$env:PLATFORM.zip"
+          Compress-Archive -Path dist/thermex-key-exporter, dist/ThermexKeyExporter -DestinationPath $archive -Force
+          $hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+          "$hash  $([System.IO.Path]::GetFileName($archive))" | Set-Content release/SHA256SUMS.txt -NoNewline -Encoding ascii
+
+      - name: Upload release archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: thermex-key-exporter-${{ matrix.label }}-${{ steps.profile.outputs.kind }}
+          path: release/
+          if-no-files-found: error

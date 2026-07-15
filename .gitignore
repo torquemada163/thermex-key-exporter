@@ -1,0 +1,75 @@
+# Operating-system files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python caches and environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+.Python
+.pytest_cache/
+.hypothesis/
+.mypy_cache/
+.pytype/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+
+# Build and release output
+build/
+dist/
+.pyinstaller-cache/
+release/
+out/
+test-output/
+exports/
+reports/
+thermex-localtuya*.json
+thermex-export*.json
+thermex-report*.txt
+*.log
+*.tmp
+*.bak
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+secrets/
+private/
+thermex-credentials.json
+thermex-credentials.json.example
+thermex-local-secrets.json
+
+# Reverse-engineering and packet-capture material
+artifacts/
+research/
+captures/
+*.pcap
+*.pcapng
+*.apk
+*.aab
+*.dex
+*.so
+*.dylib
+*.dll
+tools/
+
+# Local assistant and agent state
+.codex/
+.agents/
