@@ -12,7 +12,6 @@ import json
 import os
 import sys
 from dataclasses import fields
-from importlib.resources import as_file, files
 from pathlib import Path
 
 from .export import _atomic_write
@@ -63,18 +62,10 @@ def load_bundled_profile() -> SdkProfile:
     """Load the profile embedded in this distribution or supplied for development.
 
     ``THERMEX_PROFILE_PATH`` is a maintainer-only override.  End users receive a
-    profile from the PyInstaller or Python-package data directory and never need
-    an APK file.
+    profile from the PyInstaller data directory and never need an APK file.
     """
     override = os.environ.get("THERMEX_PROFILE_PATH")
     if override:
         return load_profile_bundle(Path(override))
-    frozen_root = getattr(sys, "_MEIPASS", None)
-    if frozen_root:
-        return load_profile_bundle(Path(frozen_root) / _BUNDLE_RELATIVE_PATH)
-    try:
-        resource = files("thermex_key_exporter").joinpath("data", "thermex-profile.json")
-        with as_file(resource) as profile_path:
-            return load_profile_bundle(profile_path)
-    except ModuleNotFoundError as error:
-        raise ProfileBundleError("the bundled Thermex profile could not be read") from error
+    root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+    return load_profile_bundle(root / _BUNDLE_RELATIVE_PATH)

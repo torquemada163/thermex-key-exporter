@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject a PyPI release workflow run whose tag does not match project metadata."""
+"""Reject a release workflow run whose tag does not match project metadata."""
 
 from __future__ import annotations
 
@@ -28,6 +28,16 @@ def _project_version() -> str:
     return metadata["project"]["version"]
 
 
+def _assert_no_unreleased_changes(changelog: str) -> None:
+    match = re.search(r"^## Unreleased\s*$", changelog, flags=re.MULTILINE)
+    if match is None:
+        return
+    next_heading = re.compile(r"^## ", flags=re.MULTILINE).search(changelog, match.end())
+    end = next_heading.start() if next_heading else None
+    if changelog[match.end() : end].strip():
+        raise ValueError("CHANGELOG.md still contains unreleased changes")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -38,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         if not re.search(rf"^## {re.escape(version)}(?:\s|$)", changelog, flags=re.MULTILINE):
             raise ValueError("CHANGELOG.md does not contain a section for the release version")
+        _assert_no_unreleased_changes(changelog)
         subprocess.run(
             ["git", "rev-parse", "--verify", f"refs/tags/{args.tag}"],
             check=True,
@@ -45,6 +56,15 @@ def main(argv: list[str] | None = None) -> int:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        tag_kind = subprocess.run(
+            ["git", "cat-file", "-t", f"refs/tags/{args.tag}"],
+            check=True,
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        ).stdout.strip()
+        if tag_kind != "tag":
+            raise ValueError("release tag must be annotated")
         tag_commit = subprocess.run(
             ["git", "rev-list", "-n", "1", args.tag],
             check=True,

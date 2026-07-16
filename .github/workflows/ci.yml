@@ -42,8 +42,3 @@ jobs:
 
       - name: Check text policy
         run: python scripts/check_text_policy.py
-
-      - name: Build and smoke-test the Python CLI distribution
-        run: |
-          python scripts/build_python_distribution.py --synthetic-profile --clean
-          python scripts/check_python_distribution.py --dist-dir dist/python --expect-profile --pipx

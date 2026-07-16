@@ -41,25 +41,16 @@ gui = [
 ]
 dev = [
   "Pillow>=10",
-  "build>=1.2",
-  "pipx>=1.7",
   "pyinstaller>=6.10",
   "pytest>=8",
   "ruff>=0.8",
-  "twine>=6",
 ]
 
 [project.scripts]
 thermex-key-exporter = "thermex_key_exporter.cli:main"
 
-[tool.setuptools]
-include-package-data = true
-
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-thermex_key_exporter = ["data/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
